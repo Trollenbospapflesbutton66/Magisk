@@ -12,8 +12,11 @@ import com.topjohnwu.magisk.core.repository.DBConfig
 import com.topjohnwu.magisk.core.repository.PreferenceConfig
 import com.topjohnwu.magisk.core.utils.refreshLocale
 import com.topjohnwu.magisk.ui.theme.Theme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.io.IOException
 
 object Config : PreferenceConfig, DBConfig {
 
@@ -37,6 +40,7 @@ object Config : PreferenceConfig, DBConfig {
         const val SU_MNT_NS = "mnt_ns"
         const val SU_BIOMETRIC = "su_biometric"
         const val ZYGISK = "zygisk"
+        const val BOOTLOOP = "bootloop"
         const val DENYLIST = "denylist"
         const val SU_MANAGER = "requester"
         const val KEYSTORE = "keystore"
@@ -163,6 +167,7 @@ object Config : PreferenceConfig, DBConfig {
             suBiometric = value
         }
     var zygisk by dbSettings(Key.ZYGISK, false)
+    var bootloop by dbSettings(Key.BOOTLOOP, 0)
     var denyList by BoolDBPropertyNoWrite(Key.DENYLIST, false)
     var suManager by dbStrings(Key.SU_MANAGER, "", true)
     var keyStoreRaw by dbStrings(Key.KEYSTORE, "", true)
@@ -171,8 +176,14 @@ object Config : PreferenceConfig, DBConfig {
 
     fun load(pkg: String?) {
         // Only try to load prefs when fresh install and a previous package name is set
-        if (pkg != null && prefs.all.isEmpty()) runCatching {
-            context.contentResolver.openInputStream(Provider.preferencesUri(pkg))?.writeTo(prefsFile)
+        if (pkg != null && prefs.all.isEmpty()) {
+            runBlocking {
+                try {
+                    context.contentResolver
+                        .openInputStream(Provider.preferencesUri(pkg))
+                        ?.writeTo(prefsFile, dispatcher = Dispatchers.Unconfined)
+                } catch (ignored: IOException) {}
+            }
             return
         }
 
